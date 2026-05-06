@@ -1,0 +1,593 @@
+
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FDF Lejrfordeling</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+  :root {
+    --bg:#f4f1eb;--surface:#fffef9;--surface2:#edeade;--border:#d4cfc3;
+    --text:#1a1814;--text2:#6b6558;
+    --green:#2d6a4f;--green-light:#d8f0e4;
+    --amber:#b45309;--amber-light:#fef3c7;
+    --blue:#1d4ed8;--blue-light:#dbeafe;
+    --red:#b91c1c;--red-light:#fee2e2;
+    --mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh}
+  header{background:var(--text);color:var(--bg);padding:1.1rem 2rem;display:flex;align-items:center;gap:1rem}
+  header h1{font-size:1.05rem;font-weight:500;letter-spacing:.04em}
+  header span{font-family:var(--mono);font-size:.72rem;color:#888;margin-left:auto}
+  .tabs{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex;gap:0;overflow-x:auto}
+  .tab{padding:.7rem 1.1rem;font-size:.82rem;font-weight:500;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s}
+  .tab:hover{color:var(--text)}
+  .tab.active{color:var(--text);border-bottom-color:var(--text)}
+  .tab.empty{color:var(--border);cursor:default;font-style:italic}
+  .main{padding:1.25rem 2rem;max-width:1400px;margin:0 auto}
+  .no-data{background:var(--surface);border:1px dashed var(--border);border-radius:8px;padding:3rem 2rem;text-align:center;color:var(--text2);font-size:.9rem}
+  .no-data strong{display:block;font-size:1.1rem;color:var(--text);margin-bottom:.5rem}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem 1.25rem;margin-bottom:.9rem}
+  .panel-title{font-size:.72rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.7rem}
+  .ctrl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:.65rem 2rem}
+  .ctrl{display:flex;align-items:center;gap:.7rem}
+  .ctrl label{font-size:.8rem;color:var(--text2);min-width:195px}
+  .ctrl input[type=range]{flex:1;accent-color:var(--text)}
+  .ctrl .val{font-family:var(--mono);font-size:.78rem;min-width:42px;text-align:right;color:var(--text)}
+  .mat-grid{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:.5rem}
+  .mat-btn{font-family:var(--mono);font-size:.73rem;padding:4px 9px;border-radius:4px;border:1px solid var(--border);cursor:pointer;background:var(--surface);color:var(--text2);transition:all .12s}
+  .mat-btn:hover{background:var(--surface2)}
+  .mat-btn.senior{background:var(--blue-light);color:var(--blue);border-color:var(--blue)}
+  .mat-btn.strom{background:var(--amber-light);color:var(--amber);border-color:var(--amber)}
+  .mat-btn.senior.strom{background:linear-gradient(135deg,var(--blue-light) 50%,var(--amber-light) 50%);border-color:var(--blue)}
+  .zone-info{font-size:.76rem;color:var(--text2);margin-top:.5rem;line-height:1.6}
+  .zone-info strong{color:var(--text)}
+  .zone-warn{color:var(--red);font-weight:500}
+  .zone-ok{color:var(--green);font-weight:500}
+  .sr-suggestion{font-size:.75rem;color:var(--amber);margin-top:.3rem}
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin-bottom:.9rem}
+  .metric{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:.8rem 1rem}
+  .metric.warn{border-color:var(--red);background:var(--red-light)}
+  .metric.ok{border-color:var(--green);background:var(--green-light)}
+  .ml{font-size:.72rem;color:var(--text2);margin-bottom:3px}
+  .mv{font-family:var(--mono);font-size:1.35rem;font-weight:500}
+  .ms{font-size:.68rem;color:var(--text2);margin-top:2px}
+  .tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:.9rem}
+  table{width:100%;border-collapse:collapse;font-size:.79rem}
+  th{padding:7px 9px;text-align:left;font-size:.7rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);background:var(--surface2)}
+  td{padding:6px 9px;border-bottom:1px solid var(--border);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  tr.row-sr td:first-child{border-left:3px solid var(--blue);padding-left:6px}
+  tr.row-strom td:first-child{border-left:3px solid var(--amber);padding-left:6px}
+  tr:hover td{background:var(--surface2)}
+  .tag{display:inline-block;font-size:.69rem;padding:1px 6px;border-radius:3px;margin:1px 1px 1px 0;line-height:1.6;font-family:var(--mono)}
+  .tag-sr{background:var(--blue-light);color:var(--blue)}
+  .tag-strom{background:var(--amber-light);color:var(--amber)}
+  .tag-normal{background:var(--surface2);color:var(--text2)}
+  .rg{color:var(--green);font-family:var(--mono);font-weight:500}
+  .ro{color:var(--text);font-family:var(--mono);font-weight:500}
+  .rw{color:var(--red);font-family:var(--mono);font-weight:500}
+  .actions{display:flex;gap:.65rem;flex-wrap:wrap;margin-bottom:.9rem}
+  .btn{font-family:var(--sans);font-size:.8rem;font-weight:500;padding:.45rem 1rem;border-radius:6px;border:1px solid var(--border);cursor:pointer;background:var(--surface);color:var(--text);transition:all .12s}
+  .btn:hover{background:var(--surface2)}
+  .btn-primary{background:var(--text);color:var(--bg);border-color:var(--text)}
+  .btn-primary:hover{background:#333}
+  .computing{font-size:.8rem;color:var(--text2);padding:.4rem 0;font-family:var(--mono)}
+  .warn-box{font-size:.78rem;color:var(--red);background:var(--red-light);border-radius:6px;padding:8px 12px;margin-bottom:.75rem;line-height:1.6}
+  .info-box{font-size:.78rem;color:var(--amber);background:var(--amber-light);border-radius:6px;padding:8px 12px;margin-bottom:.75rem;line-height:1.6}
+  .legend{font-size:.73rem;color:var(--text2);padding:.7rem 1rem}
+  .leg-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:3px;vertical-align:middle}
+  .priority-note{font-size:.75rem;color:var(--text2);background:var(--surface2);border-radius:6px;padding:7px 11px;margin-bottom:.9rem;line-height:1.7}
+  .priority-note strong{color:var(--text)}
+</style>
+</head>
+<body>
+<header>
+  <h1>FDF · Lejrpladsfordeling</h1>
+  <span>Stjernepejlerne 2025</span>
+</header>
+<div class="tabs" id="tabs"></div>
+<div class="main" id="main"></div>
+
+<script>
+const LANDSDELE = {
+  "FDF Landsdel 1": {
+    matrikler:[
+      {id:'L1.1',areal:629},{id:'L1.2',areal:944},{id:'L1.3',areal:534},
+      {id:'L1.4',areal:877},{id:'L1.5',areal:997},{id:'L1.6',areal:856},
+      {id:'L1.7',areal:847},{id:'L1.8',areal:773},{id:'L1.9',areal:816},
+      {id:'L1.10',areal:984},{id:'L1.11',areal:980},{id:'L1.12',areal:615},
+    ],
+    naboer:[
+      [1,2],[0,2,3,4],[0,1,3,5],[1,2,4,5,6],
+      [1,3,6,7],[2,3,6,8],[3,4,5,7,8],[4,6,8,9,10],
+      [5,6,7,9],[7,8,10,11],[7,9,11],[9,10],
+    ],
+    enheder:[
+      {n:'FDF Biersted familie',        d:2,  s:0,sr:false},
+      {n:'FDF Biersted m.fl.',          d:73, s:1,sr:false},
+      {n:'FDF Brønderslev',             d:19, s:0,sr:false},
+      {n:'FDF Dronninglund',            d:43, s:0,sr:false},
+      {n:'FDF Frederikshavn 1',         d:39, s:0,sr:false},
+      {n:'FDF Frederikshavn 2',         d:23, s:0,sr:false},
+      {n:'FDF Gug og FDF Aabybro',      d:59, s:2,sr:false},
+      {n:'FDF Hals',                    d:14, s:1,sr:false},
+      {n:'FDF Kærby',                   d:65, s:1,sr:false},
+      {n:'FDF Romdrup-Klarup',          d:22, s:0,sr:false},
+      {n:'FDF Skalborg og FDF Pandrup', d:18, s:0,sr:false},
+      {n:'FDF Solsiden',                d:14, s:0,sr:false},
+      {n:'FDF Storvorde-Sejlflod',      d:66, s:0,sr:false},
+      {n:'FDF Svenstrup og Sønderholm', d:28, s:1,sr:false},
+      {n:'FDF Tårs',                    d:46, s:1,sr:false},
+      {n:'FDF Vester Hassing',          d:64, s:0,sr:false},
+      {n:'FDF Visse',                   d:29, s:1,sr:false},
+      {n:'FDF Vodskov',                 d:43, s:0,sr:false},
+      {n:'FDF Øster Hassing',           d:33, s:0,sr:false},
+      {n:'FDF Aalborg 8 Nr. Tranders',  d:47, s:0,sr:false},
+      {n:'FDF Ålbæk og FDF Standby',    d:29, s:0,sr:false},
+      {n:'Seniorlejr - FDF Ålbæk',      d:17, s:0,sr:true},
+      {n:'Seniorlejr - Reservedelene',  d:10, s:0,sr:true},
+      {n:'Seniorlejr - Senior 1',       d:39, s:0,sr:true},
+      {n:'Seniorlejr - Tandhjul u.t.',  d:31, s:0,sr:true},
+      {n:'Seniorlejr - Tut Tuut',       d:40, s:0,sr:true},
+    ],
+    defaultSenior:[0,2],
+    defaultStrom:[],
+  },
+  "FDF Landsdel 2":null,"FDF Landsdel 3":null,"FDF Landsdel 4":null,
+  "FDF Landsdel 5":null,"FDF Landsdel 6":null,"FDF Landsdel 7":null,"FDF Landsdel 8":null,
+};
+
+const MIN_RATIO = 9;
+let currentLD = "FDF Landsdel 1";
+
+const ldState = {};
+for(const name of Object.keys(LANDSDELE)){
+  const ld = LANDSDELE[name];
+  ldState[name] = {
+    senior: new Set(ld?.defaultSenior||[]),
+    strom:  new Set(ld?.defaultStrom||[]),
+    grund:  15,
+    svægt:  4,
+  };
+}
+
+// ── TABS ─────────────────────────────────────────────────────────────────────
+function buildTabs(){
+  const el=document.getElementById('tabs');
+  el.innerHTML='';
+  for(const name of Object.keys(LANDSDELE)){
+    const hasData=LANDSDELE[name]!==null;
+    const t=document.createElement('div');
+    t.className='tab'+(name===currentLD?' active':'')+(hasData?'':' empty');
+    t.textContent=name.replace('FDF ','')+(hasData?'':' –');
+    t.title=hasData?name:name+' (afventer data)';
+    if(hasData) t.onclick=()=>{currentLD=name;buildTabs();renderMain();};
+    el.appendChild(t);
+  }
+}
+
+// ── MAIN ─────────────────────────────────────────────────────────────────────
+function renderMain(){
+  const ld=LANDSDELE[currentLD];
+  const st=ldState[currentLD];
+  const main=document.getElementById('main');
+  if(!ld){
+    main.innerHTML=`<div class="no-data"><strong>${currentLD}</strong>Afventer data — send matrikler, arealer og enheder for denne landsdel.</div>`;
+    return;
+  }
+  main.innerHTML=`
+    <div class="priority-note">
+      <strong>Prioritering:</strong>
+      1. Alle deltagere får så ens m²/deltager som muligt &nbsp;·&nbsp;
+      2. Ingen matrikel under ${MIN_RATIO} m²/deltager (seniorzone vises med advarsel hvis umuligt) &nbsp;·&nbsp;
+      3. Seniormatrikler kun seniorlejre &nbsp;·&nbsp;
+      4. Strøm samles helst på skovkant-matrikler (blødt)
+    </div>
+    <div class="panel">
+      <div class="panel-title">Indstillinger</div>
+      <div class="ctrl-grid">
+        <div class="ctrl">
+          <label>Grundareal pr. enhed (m²)</label>
+          <input type="range" id="grund" min="0" max="40" step="5" value="${st.grund}" oninput="ldState[currentLD].grund=+this.value;document.getElementById('gv').textContent=this.value;updateZoneInfo();scheduleRender()">
+          <span class="val" id="gv">${st.grund}</span>
+        </div>
+        <div class="ctrl">
+          <label>Strøm-samling (0=ignorér · 10=forsøg)</label>
+          <input type="range" id="svægt" min="0" max="10" step="1" value="${st.svægt}" oninput="ldState[currentLD].svægt=+this.value;document.getElementById('vv').textContent=this.value;scheduleRender()">
+          <span class="val" id="vv">${st.svægt}</span>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Matrikel-roller — klik: 🔵 Seniorzone (1-2 naboende) · ⚡ Strøm-adgang · klik igen for at fjerne</div>
+      <div class="mat-grid" id="matgrid"></div>
+      <div id="zoneinfo"></div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="exportExcel()">⬇ Excel</button>
+      <button class="btn" onclick="exportCSV()">⬇ CSV</button>
+    </div>
+    <div id="msgbox"></div>
+    <div class="computing" id="computing" style="display:none">Beregner...</div>
+    <div class="metrics" id="metrics"></div>
+    <div class="tbl-wrap" id="tblwrap" style="display:none">
+      <table>
+        <thead><tr><th>Matrikel</th><th>Areal m²</th><th>Effektivt m²</th><th>Deltagere</th><th>m²/deltager</th><th>Enheder</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="legend">
+      <span class="leg-dot" style="background:var(--blue)"></span>Blå kant = Seniormatrikel &nbsp;|&nbsp;
+      <span class="leg-dot" style="background:var(--amber)"></span>Gul kant = Strøm-enhed &nbsp;|&nbsp;
+      ⚡ = Strøm-adgang · 🔵 = Seniorzone
+    </div>`;
+  buildMatGrid();
+  scheduleRender();
+}
+
+// ── MATGRID ──────────────────────────────────────────────────────────────────
+function buildMatGrid(){
+  const ld=LANDSDELE[currentLD],st=ldState[currentLD];
+  const grid=document.getElementById('matgrid');
+  if(!grid)return;
+  grid.innerHTML='';
+  ld.matrikler.forEach((m,i)=>{
+    const btn=document.createElement('button');
+    btn.id='mb_'+i;
+    updateBtn(btn,i,m,st);
+    btn.onclick=()=>{
+      const s=st.senior.has(i),w=st.strom.has(i);
+      if(!s&&!w)st.senior.add(i);
+      else if(s&&!w)st.strom.add(i);
+      else if(s&&w)st.senior.delete(i);
+      else st.strom.delete(i);
+      updateBtn(btn,i,m,st);
+      updateZoneInfo();
+      scheduleRender();
+    };
+    grid.appendChild(btn);
+  });
+  updateZoneInfo();
+}
+
+function updateBtn(btn,i,m,st){
+  btn.className='mat-btn'+(st.senior.has(i)?' senior':'')+(st.strom.has(i)?' strom':'');
+  btn.textContent=(st.senior.has(i)?'🔵 ':'')+(st.strom.has(i)?'⚡ ':'')+m.id+' ('+m.areal+')';
+}
+
+// ── ZONE INFO MED SENIOR-VALIDERING ──────────────────────────────────────────
+function srCheck(ld, srIdxs, grund){
+  // Returner { ok, effPrDelt, mangler, bedsteAlternativ }
+  const srENH=ld.enheder.filter(e=>e.sr);
+  const srDelt=srENH.reduce((s,e)=>s+e.d,0);
+  const srGrund=srENH.length*grund;
+  const srAreal=srIdxs.reduce((s,i)=>s+ld.matrikler[i].areal,0);
+  const srEff=srAreal-srGrund;
+  const effPrDelt=srEff/srDelt;
+  const nødvendigt=Math.ceil(srDelt*MIN_RATIO+srGrund);
+  const mangler=Math.max(0,nødvendigt-srAreal);
+
+  // Find bedste alternative nabopar der er stort nok
+  let bedsteAlternativ=null;
+  if(mangler>0){
+    const N=ld.matrikler.length;
+    let bedst=null,bedstDiff=Infinity;
+    // Enkelt matrikel
+    for(let a=0;a<N;a++){
+      const eff=ld.matrikler[a].areal-srGrund;
+      if(eff/srDelt>=MIN_RATIO){
+        const diff=Math.abs(eff/srDelt-MIN_RATIO);
+        if(diff<bedstDiff){bedstDiff=diff;bedst=[ld.matrikler[a].id];}
+      }
+    }
+    // Nabopar
+    for(let a=0;a<N;a++){
+      for(const b of ld.naboer[a]){
+        if(b<=a)continue;
+        const eff=ld.matrikler[a].areal+ld.matrikler[b].areal-srGrund;
+        if(eff/srDelt>=MIN_RATIO){
+          const diff=Math.abs(eff/srDelt-MIN_RATIO);
+          if(diff<bedstDiff){bedstDiff=diff;bedst=[ld.matrikler[a].id,ld.matrikler[b].id];}
+        }
+      }
+    }
+    bedsteAlternativ=bedst;
+  }
+  return {ok:mangler===0, effPrDelt, mangler, nødvendigt, srAreal, bedsteAlternativ};
+}
+
+function updateZoneInfo(){
+  const ld=LANDSDELE[currentLD],st=ldState[currentLD];
+  const el=document.getElementById('zoneinfo');
+  if(!el)return;
+  const srIdxs=[...st.senior];
+  const grund=st.grund;
+  const srENH=ld.enheder.filter(e=>e.sr);
+  const srDelt=srENH.reduce((s,e)=>s+e.d,0);
+  const stromTxt=[...st.strom].length>0?[...st.strom].map(i=>ld.matrikler[i].id).join(', '):'ingen markeret';
+
+  if(srIdxs.length===0){el.innerHTML='<div class="zone-info"><span class="zone-warn">Vælg 1-2 seniormatrikler</span></div>';return;}
+
+  const check=srCheck(ld,srIdxs,grund);
+  const naboOk=srIdxs.length<=1||(srIdxs.length===2&&ld.naboer[srIdxs[0]].includes(srIdxs[1]));
+
+  let html=`<div class="zone-info">
+    <strong>Seniorzone:</strong> ${srIdxs.map(i=>ld.matrikler[i].id).join(' + ')} &nbsp;·&nbsp;
+    ${srDelt} deltagere &nbsp;·&nbsp;
+    Areal: ${check.srAreal} m² &nbsp;·&nbsp;
+    m²/deltager: <strong class="${check.ok?'zone-ok':'zone-warn'}">${check.effPrDelt.toFixed(1)}</strong>
+    ${check.ok?'✓':'⚠️ under '+MIN_RATIO+' m²'}`;
+
+  if(!check.ok){
+    html+=`<br><span class="zone-warn">Mangler ${check.mangler} m² — behøver mindst ${check.nødvendigt} m² effektivt for ${srDelt} deltagere ved ${MIN_RATIO} m²/deltager.</span>`;
+    if(check.bedsteAlternativ){
+      html+=`<br><span class="sr-suggestion">💡 Prøv i stedet: ${check.bedsteAlternativ.join(' + ')} (mindste matrikel/-par der opfylder kravet)</span>`;
+    } else {
+      html+=`<br><span class="sr-suggestion">💡 Ingen enkelt matrikel eller nabopar er stort nok — reducer grundarealet eller sænk minimumgrænsen.</span>`;
+    }
+  }
+  if(srIdxs.length===2&&!naboOk) html+=`<br><span class="zone-warn">⚠️ Disse to matrikler er ikke naboer på kortet!</span>`;
+  if(srIdxs.length>2) html+=`<br><span class="zone-warn">⚠️ Max 2 seniormatrikler!</span>`;
+  html+=` &nbsp;·&nbsp; <strong>Strøm-adgang:</strong> ${stromTxt}</div>`;
+  el.innerHTML=html;
+}
+
+// ── ALGORITME ────────────────────────────────────────────────────────────────
+function effAreal(ld,mi,units,grund){return ld.matrikler[mi].areal-units.length*grund;}
+function slotRatio(ld,mi,units,grund){
+  if(!units.length)return 0;
+  return effAreal(ld,mi,units,grund)/units.reduce((s,u)=>s+u.d,0);
+}
+
+function fordelSeniorer(ld,srIdxs,grund){
+  const srENH=ld.enheder.filter(e=>e.sr);
+  if(srIdxs.length===1)return [srENH];
+  const n=srENH.length;
+  let bestV=Infinity,bestA=null,bestMinR=-Infinity;
+  for(let mask=1;mask<(1<<n)-1;mask++){
+    const a=[],b=[];
+    for(let k=0;k<n;k++)(mask>>k&1?a:b).push(srENH[k]);
+    const dA=a.reduce((s,e)=>s+e.d,0),dB=b.reduce((s,e)=>s+e.d,0);
+    const effA=ld.matrikler[srIdxs[0]].areal-a.length*grund;
+    const effB=ld.matrikler[srIdxs[1]].areal-b.length*grund;
+    const r0=effA/dA,r1=effB/dB;
+    const minR=Math.min(r0,r1);
+    const v=(r0-r1)**2;
+    // Primært: maksimer det laveste ratio (løft bundniveau)
+    // Sekundært: minimér varians
+    if(minR>bestMinR||(Math.abs(minR-bestMinR)<0.01&&v<bestV)){
+      bestMinR=minR;bestV=v;bestA=[a,b];
+    }
+  }
+  return bestA;
+}
+
+function scoreSlots(ld,slots,nsIdxs,st,grund,svægt,target){
+  let variance=0,stromPen=0;
+  for(const i of nsIdxs){
+    if(!slots[i].length){variance+=1e8;continue;}
+    const r=slotRatio(ld,i,slots[i],grund);
+    if(r<MIN_RATIO)variance+=1e6*(MIN_RATIO-r)**2;
+    variance+=(r-target)**2;
+    if(!st.strom.has(i))stromPen+=slots[i].reduce((s,u)=>s+u.s,0);
+  }
+  const sw=(svægt/10)*0.20;
+  return variance+sw*stromPen*(variance/Math.max(nsIdxs.length,1)+1);
+}
+
+function compute(ld,st){
+  const grund=st.grund,svægt=st.svægt;
+  const srIdxs=[...st.senior];
+  if(srIdxs.length===0||srIdxs.length>2)return null;
+  if(srIdxs.length===2&&!ld.naboer[srIdxs[0]].includes(srIdxs[1]))return null;
+
+  const nsIdxs=ld.matrikler.map((_,i)=>i).filter(i=>!st.senior.has(i));
+  const nsENH=ld.enheder.filter(e=>!e.sr);
+  const nsAreal=nsIdxs.reduce((s,i)=>s+ld.matrikler[i].areal,0);
+  const nsDelt=nsENH.reduce((s,e)=>s+e.d,0);
+  const target=(nsAreal-nsENH.length*grund)/nsDelt;
+
+  const slots=ld.matrikler.map(()=>[]);
+
+  // Seniorer
+  const srAssign=fordelSeniorer(ld,srIdxs,grund);
+  srIdxs.forEach((mi,k)=>srAssign[k].forEach(e=>slots[mi].push(e)));
+
+  // NS fase 1: én enhed til hvert slot
+  const pool=[...nsENH].sort((a,b)=>b.d-a.d);
+  const nsByAreal=[...nsIdxs].sort((a,b)=>ld.matrikler[b].areal-ld.matrikler[a].areal);
+  for(const mi of nsByAreal){
+    if(!pool.length)break;
+    let bi=0,bd=Infinity;
+    for(let k=0;k<pool.length;k++){
+      const r=slotRatio(ld,mi,[pool[k]],grund);
+      const dev=(r-target)**2;
+      const sb=(pool[k].s>0&&st.strom.has(mi))?(svægt/10)*0.05*dev:0;
+      if(dev-sb<bd){bd=dev-sb;bi=k;}
+    }
+    slots[mi].push(pool.splice(bi,1)[0]);
+  }
+  // NS fase 2: rest greedy
+  for(const u of pool){
+    let bi=nsIdxs[0],bs=Infinity;
+    for(const mi of nsIdxs){
+      const r=slotRatio(ld,mi,[...slots[mi],u],grund);
+      const dev=(r-target)**2;
+      const sb=(u.s>0&&st.strom.has(mi))?(svægt/10)*0.05*dev:0;
+      if(dev-sb<bs){bs=dev-sb;bi=mi;}
+    }
+    slots[bi].push(u);
+  }
+
+  // NS fase 3: lokal søgning
+  let bestSc=scoreSlots(ld,slots,nsIdxs,st,grund,svægt,target);
+  let improved=true,iter=0;
+  while(improved&&iter<2000){
+    improved=false;iter++;
+    outer:
+    for(let ai=0;ai<nsIdxs.length;ai++){
+      for(let aj=ai+1;aj<nsIdxs.length;aj++){
+        const i=nsIdxs[ai],j=nsIdxs[aj];
+        for(let ki=0;ki<slots[i].length;ki++){
+          for(let kj=0;kj<slots[j].length;kj++){
+            const tmp=slots[i][ki];slots[i][ki]=slots[j][kj];slots[j][kj]=tmp;
+            const ns=scoreSlots(ld,slots,nsIdxs,st,grund,svægt,target);
+            if(ns<bestSc+1e-6){bestSc=ns;improved=true;break outer;}
+            slots[j][kj]=slots[i][ki];slots[i][ki]=tmp;
+          }
+        }
+        if(slots[i].length>1){
+          for(let ki=0;ki<slots[i].length;ki++){
+            const u=slots[i].splice(ki,1)[0];slots[j].push(u);
+            const ns=scoreSlots(ld,slots,nsIdxs,st,grund,svægt,target);
+            if(ns<bestSc+1e-6){bestSc=ns;improved=true;break outer;}
+            slots[j].pop();slots[i].splice(ki,0,u);
+          }
+        }
+        if(slots[j].length>1){
+          for(let kj=0;kj<slots[j].length;kj++){
+            const u=slots[j].splice(kj,1)[0];slots[i].push(u);
+            const ns=scoreSlots(ld,slots,nsIdxs,st,grund,svægt,target);
+            if(ns<bestSc+1e-6){bestSc=ns;improved=true;break outer;}
+            slots[i].pop();slots[j].splice(kj,0,u);
+          }
+        }
+      }
+    }
+  }
+  return{slots,srIdxs,nsIdxs,target};
+}
+
+// ── RENDER ───────────────────────────────────────────────────────────────────
+function render(){
+  const ld=LANDSDELE[currentLD],st=ldState[currentLD];
+  if(!ld)return;
+  updateZoneInfo();
+  const grund=st.grund;
+  const srIdxs=[...st.senior];
+  const msgEl=document.getElementById('msgbox');
+  if(!msgEl)return;
+
+  // Validering
+  if(srIdxs.length===0){msgEl.innerHTML='<div class="warn-box">⚠️ Vælg mindst 1 seniormatrikel (klik 🔵 på en matrikel).</div>';document.getElementById('computing').style.display='none';document.getElementById('tblwrap').style.display='none';return;}
+  if(srIdxs.length>2){msgEl.innerHTML='<div class="warn-box">⚠️ Max 2 seniormatrikler.</div>';document.getElementById('computing').style.display='none';document.getElementById('tblwrap').style.display='none';return;}
+  if(srIdxs.length===2&&!LANDSDELE[currentLD].naboer[srIdxs[0]].includes(srIdxs[1])){msgEl.innerHTML='<div class="warn-box">⚠️ De to seniormatrikler er ikke naboer!</div>';document.getElementById('computing').style.display='none';document.getElementById('tblwrap').style.display='none';return;}
+
+  // Senior-advarsel (men fortsæt beregning)
+  const check=srCheck(ld,srIdxs,grund);
+  if(!check.ok){
+    let msg=`<div class="info-box">⚠️ <strong>Seniorzone for lille:</strong> ${check.effPrDelt.toFixed(1)} m²/deltager — under minimum ${MIN_RATIO} m². Mangler ${check.mangler} m².`;
+    if(check.bedsteAlternativ) msg+=` <strong>Forslag: ${check.bedsteAlternativ.join(' + ')}</strong>`;
+    msg+=`</div>`;
+    msgEl.innerHTML=msg;
+  } else {
+    msgEl.innerHTML='';
+  }
+
+  const res=compute(ld,st);
+  if(!res){document.getElementById('computing').style.display='none';return;}
+
+  const{slots,srIdxs:srI,nsIdxs,target}=res;
+  const nsRatios=nsIdxs.map(i=>slotRatio(ld,i,slots[i],grund));
+  const avg=nsRatios.reduce((a,b)=>a+b,0)/nsRatios.length;
+  const std=Math.sqrt(nsRatios.reduce((s,r)=>s+(r-avg)**2,0)/nsRatios.length);
+  const minR=Math.min(...nsRatios),maxR=Math.max(...nsRatios);
+  const underMin=nsIdxs.filter(i=>slotRatio(ld,i,slots[i],grund)<MIN_RATIO).length;
+  const srENH=ld.enheder.filter(e=>e.sr);
+  const srDelt=srENH.reduce((s,e)=>s+e.d,0);
+  const srRatios=srI.map(i=>slotRatio(ld,i,slots[i],grund));
+  const srMinR=Math.min(...srRatios);
+  const stromMat=nsIdxs.filter(i=>slots[i].some(u=>u.s>0));
+  const stromPåAdg=stromMat.filter(i=>st.strom.has(i)).length;
+  const stromUdenAdg=stromMat.filter(i=>!st.strom.has(i)).length;
+
+  document.getElementById('metrics').innerHTML=`
+    <div class="metric ${underMin>0?'warn':''}"><div class="ml">Kredse m²/deltager</div><div class="mv">${avg.toFixed(1)}</div><div class="ms">Min ${minR.toFixed(1)} – Maks ${maxR.toFixed(1)} · Std ${std.toFixed(1)}</div></div>
+    <div class="metric ${srMinR<MIN_RATIO?'warn':'ok'}"><div class="ml">Seniorzone m²/deltager</div><div class="mv" style="color:var(--blue)">${srRatios.map(r=>r.toFixed(1)).join(' / ')}</div><div class="ms">${srI.map(i=>ld.matrikler[i].id).join(' + ')} · ${srDelt} pers. ${srMinR<MIN_RATIO?'⚠️ under min':'✓'}</div></div>
+    <div class="metric"><div class="ml">Strøm: adgang / uden</div><div class="mv">${stromPåAdg}✓${stromUdenAdg>0?' '+stromUdenAdg+'✗':''}</div><div class="ms">${stromMat.length} matrikler med strøm</div></div>
+    <div class="metric"><div class="ml">Total deltagere</div><div class="mv">${ld.enheder.reduce((s,e)=>s+e.d,0)}</div><div class="ms">${ld.matrikler.reduce((s,m)=>s+m.areal,0)} m² total</div></div>
+  `;
+
+  const tbody=document.getElementById('tbody');
+  tbody.innerHTML='';
+  for(let i=0;i<ld.matrikler.length;i++){
+    const units=slots[i],isSr=st.senior.has(i);
+    const ratio=slotRatio(ld,i,units,grund);
+    const dev=Math.abs(ratio-avg);
+    const rc=ratio<MIN_RATIO?'rw':dev<1?'rg':dev<3?'ro':'rw';
+    const hasStr=units.some(u=>u.s>0);
+    const rowCls=isSr?'row-sr':hasStr?'row-strom':'';
+    const tags=units.map(u=>`<span class="tag ${u.sr?'tag-sr':u.s>0?'tag-strom':'tag-normal'}">${u.n} (${u.d}${u.s>0?' ⚡×'+u.s:''})</span>`).join('');
+    tbody.innerHTML+=`<tr class="${rowCls}">
+      <td><strong>${ld.matrikler[i].id}</strong>${st.strom.has(i)?' ⚡':''}${isSr?' 🔵':''}</td>
+      <td>${ld.matrikler[i].areal}</td><td>${effAreal(ld,i,units,grund)}</td>
+      <td>${units.reduce((s,u)=>s+u.d,0)}</td>
+      <td class="${rc}">${ratio.toFixed(1)}</td><td>${tags}</td>
+    </tr>`;
+  }
+  document.getElementById('computing').style.display='none';
+  document.getElementById('tblwrap').style.display='block';
+}
+
+let timer=null;
+function scheduleRender(){
+  clearTimeout(timer);
+  const c=document.getElementById('computing');
+  if(c)c.style.display='block';
+  timer=setTimeout(render,130);
+}
+
+// ── EXPORT ───────────────────────────────────────────────────────────────────
+function getRows(ldName){
+  const ld=LANDSDELE[ldName];if(!ld)return[];
+  const st=ldState[ldName];
+  const srIdxs=[...st.senior];
+  if(srIdxs.length===0||srIdxs.length>2)return[];
+  if(srIdxs.length===2&&!ld.naboer[srIdxs[0]].includes(srIdxs[1]))return[];
+  const res=compute(ld,st);if(!res)return[];
+  const{slots}=res;const grund=st.grund;
+  const rows=[];
+  for(let i=0;i<ld.matrikler.length;i++){
+    const units=slots[i],isSr=st.senior.has(i);
+    const ratio=slotRatio(ld,i,units,grund),eff=effAreal(ld,i,units,grund);
+    const delt=units.reduce((s,u)=>s+u.d,0);
+    for(const u of units){
+      rows.push({Landsdel:ldName,Matrikel:ld.matrikler[i].id,'Areal (m²)':ld.matrikler[i].areal,
+        'Effektivt areal (m²)':eff,Deltagere:delt,'M²/deltager':+ratio.toFixed(1),
+        Seniorzone:isSr?'Ja':'Nej','Strøm-adgang':st.strom.has(i)?'Ja':'Nej',
+        Boenhed:u.n,'Boenhed deltagere':u.d,'CPAP-stik':u.s||'',Seniorlejr:u.sr?'Ja':'Nej'});
+    }
+  }
+  return rows;
+}
+function exportExcel(){
+  const wb=XLSX.utils.book_new();
+  for(const name of Object.keys(LANDSDELE)){
+    if(!LANDSDELE[name])continue;
+    const rows=getRows(name);if(!rows.length)continue;
+    const ws=XLSX.utils.json_to_sheet(rows);
+    ws['!cols']=[20,10,12,18,10,12,12,13,36,18,10,12].map(w=>({wch:w}));
+    XLSX.utils.book_append_sheet(wb,ws,name.replace('FDF ',''));
+  }
+  XLSX.writeFile(wb,'FDF_Lejrfordeling.xlsx');
+}
+function exportCSV(){
+  const all=[];
+  for(const name of Object.keys(LANDSDELE))all.push(...getRows(name));
+  if(!all.length)return;
+  const h=Object.keys(all[0]);
+  const csv=[h.join(';'),...all.map(r=>h.map(k=>'"'+(r[k]??'')+'"').join(';'))].join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));
+  a.download='FDF_Lejrfordeling.csv';a.click();
+}
+
+buildTabs();
+renderMain();
+</script>
+</body>
+</html>
